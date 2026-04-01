@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ofis Takvimi — Theory X</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F8FAFC;color:#1E293B;min-height:100vh}
+.header{background:#1E2433;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.header h1{color:#fff;font-size:16px;font-weight:500}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 20px;background:#fff;border-bottom:1px solid #E2E8F0}
+.view-btns{display:flex;border:1px solid #CBD5E1;border-radius:8px;overflow:hidden}
+.view-btns button{border:none;background:transparent;padding:6px 14px;font-size:13px;cursor:pointer;color:#64748B;font-family:inherit}
+.view-btns button.active{background:#EEF2FF;color:#4F46E5;font-weight:500}
+.nav-row{display:flex;align-items:center;gap:6px}
+.nav-row button{border:1px solid #CBD5E1;background:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:16px;color:#64748B;display:flex;align-items:center;justify-content:center}
+.nav-row span{font-size:14px;font-weight:500;color:#1E293B;min-width:130px;text-align:center}
+.room-filter{display:flex;gap:6px;flex-wrap:wrap;padding:10px 20px;background:#fff;border-bottom:1px solid #E2E8F0}
+.pill{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid;transition:all .15s;user-select:none}
+.legend{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:#64748B}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+.calendar-wrap{padding:16px 20px;overflow-x:auto}
+.calendar{border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;background:#fff;min-width:700px}
+.grid-header{display:grid;border-bottom:1px solid #E2E8F0;background:#F8FAFF}
+.col-hdr{padding:9px 6px;text-align:center;font-size:11px;font-weight:500;color:#64748B;border-right:1px solid #E2E8F0}
+.col-hdr:last-child{border-right:none}
+.col-hdr.today-hdr{color:#4F46E5;font-weight:600}
+.time-col{font-size:10px;color:#94A3B8;text-align:right;padding:3px 8px 0 4px;height:48px;display:flex;align-items:flex-start;border-right:1px solid #E2E8F0;background:#FAFAFA;min-width:44px}
+.hour-row{display:grid;border-bottom:1px solid #F1F5F9}
+.hour-row:last-child{border-bottom:none}
+.day-cell{height:48px;border-right:1px solid #F1F5F9;position:relative;cursor:pointer;transition:background .1s}
+.day-cell:last-child{border-right:none}
+.day-cell:hover{background:#F8FAFF}
+.res-block{position:absolute;left:2px;right:2px;top:2px;border-radius:5px;padding:3px 6px;font-size:10px;font-weight:500;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;z-index:2;border-left:3px solid}
+.month-grid{display:grid;grid-template-columns:repeat(7,1fr)}
+.month-day{border-right:1px solid #F1F5F9;border-bottom:1px solid #F1F5F9;min-height:90px;padding:5px;cursor:pointer;transition:background .1s}
+.month-day:hover{background:#F8FAFF}
+.month-day:nth-child(7n){border-right:none}
+.day-num{font-size:12px;font-weight:500;color:#64748B;margin-bottom:4px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.day-num.is-today{background:#4F46E5;color:#fff}
+.other-month .day-num{color:#CBD5E1}
+.month-res{font-size:10px;padding:2px 5px;border-radius:4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
+.modal{background:#fff;border-radius:14px;padding:22px;width:340px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:16px;color:#1E293B}
+.form-row{margin-bottom:12px}
+.form-row label{display:block;font-size:11px;font-weight:500;color:#64748B;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.form-row input,.form-row select,.form-row textarea{width:100%;font-size:13px;padding:8px 10px;border:1px solid #CBD5E1;border-radius:8px;font-family:inherit;color:#1E293B;background:#fff;outline:none;transition:border .15s}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:#4F46E5}
+.form-row textarea{resize:vertical;min-height:64px}
+.people-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:8px;border:1px solid #CBD5E1;border-radius:8px}
+.people-grid label{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:#374151}
+.people-grid input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#4F46E5}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal-footer{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
+.modal-footer button{padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid #CBD5E1;background:#fff;font-family:inherit;color:#374151;transition:all .1s}
+.modal-footer button:hover{background:#F1F5F9}
+.btn-save{background:#4F46E5!important;color:#fff!important;border-color:#4F46E5!important}
+.btn-save:hover{background:#4338CA!important}
+.btn-delete{color:#DC2626!important;border-color:#FECACA!important}
+.btn-delete:hover{background:#FEF2F2!important}
+.save-badge{position:fixed;bottom:20px;right:20px;background:#1E293B;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;z-index:2000}
+.save-badge.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏢 Ofis Takvimi — Theory X</h1>
+  <div class="legend" id="legend"></div>
+</div>
+
+<div class="toolbar">
+  <div class="view-btns">
+    <button class="active" id="btn-week" onclick="setView('week')">Haftalık</button>
+    <button id="btn-month" onclick="setView('month')">Aylık</button>
+  </div>
+  <div class="nav-row">
+    <button onclick="navigate(-1)">&#8249;</button>
+    <span id="nav-label"></span>
+    <button onclick="navigate(1)">&#8250;</button>
+  </div>
+</div>
+
+<div class="room-filter" id="room-filter"></div>
+<div class="calendar-wrap"><div class="calendar" id="calendar"></div></div>
+
+<div id="modal-root"></div>
+<div class="save-badge" id="save-badge">Kaydedildi</div>
+
+<script>
+const ROOMS=[
+  {id:'a',  name:'Stüdyo A',       color:'#7C3AED',bg:'#F5F3FF',text:'#5B21B6',border:'#7C3AED'},
+  {id:'b',  name:'Stüdyo B',       color:'#0369A1',bg:'#E0F2FE',text:'#075985',border:'#0369A1'},
+  {id:'dj', name:'DJ Odası',       color:'#166534',bg:'#DCFCE7',text:'#14532D',border:'#166534'},
+  {id:'mt', name:'Toplantı Odası', color:'#92400E',bg:'#FEF3C7',text:'#78350F',border:'#92400E'},
+];
+const TEAM=['Emrah','Dere','Utku','Fatih','Mehmet','Sezer','Orhun'];
+const DAYS_TR=['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+const MONTHS_TR=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const HOURS=Array.from({length:14},(_,i)=>i+8);
+
+let view='week';
+let activeRooms=new Set(ROOMS.map(r=>r.id));
+let currentDate=new Date(2026,3,15);
+let nextId=100;
+
+// ── Google Apps Script URL ───────────────────────────────────
+const SCRIPT_URL='https://script.google.com/a/macros/theoryxmusic.com/s/AKfycbwtsLUwy01sChg0l72ozpjAdkTuS5MBeGeXYFEqIjQwWK6W-FzB1Vnz-pzO-gn1nQJnsw/exec';
+const LOCAL_KEY='theoryx_calendar_v2';
+let reservations=[];
+let syncStatus='idle'; // idle | loading | saving | error
+
+function showStatus(msg, type='info'){
+  const b=document.getElementById('save-badge');
+  b.textContent=msg;
+  b.style.background=type==='error'?'#DC2626':type==='ok'?'#166534':'#1E293B';
+  b.classList.add('show');
+  setTimeout(()=>b.classList.remove('show'), type==='error'?3000:1800);
+}
+
+// Önce localStorage'dan yükle (hızlı açılış), sonra sunucudan güncelle
+function loadData(){
+  // 1) localStorage'dan anlık göster
+  try{
+    const saved=localStorage.getItem(LOCAL_KEY);
+    if(saved){ reservations=JSON.parse(saved); render(); }
+  }catch(e){}
+
+  // 2) Apps Script'ten güncel veriyi çek
+  showStatus('Google Calendar\'dan yükleniyor…');
+  fetch(SCRIPT_URL+'?action=getAll')
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.success && Array.isArray(data.reservations)){
+        reservations=data.reservations;
+        // id sayacını güncelle
+        const maxId=reservations.reduce((m,r)=>Math.max(m,Number(r.id)||0),99);
+        nextId=maxId+1;
+        localStorage.setItem(LOCAL_KEY,JSON.stringify(reservations));
+        render();
+        showStatus('Senkronize edildi ✓','ok');
+      }
+    })
+    .catch(()=>{
+      // Sunucuya ulaşılamazsa localStorage yeter
+      showStatus('Çevrimdışı mod (localStorage)','error');
+    });
+}
+
+// Rezervasyonu hem localStorage'a hem Apps Script'e kaydet
+function saveData(){
+  localStorage.setItem(LOCAL_KEY,JSON.stringify(reservations));
+}
+
+async function pushToScript(reservation, isDelete=false){
+  showStatus('Kaydediliyor…');
+  try{
+    const body=isDelete
+      ? {action:'delete', id:reservation.id}
+      : {action:'save',   reservation};
+
+    const res=await fetch(SCRIPT_URL,{
+      method:'POST',
+      body:JSON.stringify(body),
+    });
+    const data=await res.json();
+    if(data.success){
+      // gcalId geri dönüyorsa sakla
+      if(data.gcalId && !isDelete){
+        const r=reservations.find(x=>x.id===reservation.id);
+        if(r) r.gcalId=data.gcalId;
+        localStorage.setItem(LOCAL_KEY,JSON.stringify(reservations));
+      }
+      showStatus('Google Calendar\'a kaydedildi ✓','ok');
+    } else {
+      showStatus('Hata: '+(data.error||'bilinmeyen'),'error');
+    }
+  }catch(e){
+    showStatus('Bağlantı hatası — sadece lokalda kaydedildi','error');
+  }
+}
+
+function dateStr(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function getMonday(d){const day=d.getDay();const diff=d.getDate()-day+(day===0?-6:1);const s=new Date(d);s.setDate(diff);return s}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r}
+function isToday(d){const t=new Date();return d.toDateString()===t.toDateString()}
+
+function setView(v){
+  view=v;
+  document.getElementById('btn-week').classList.toggle('active',v==='week');
+  document.getElementById('btn-month').classList.toggle('active',v==='month');
+  render();
+}
+
+function navigate(dir){
+  if(view==='week') currentDate=addDays(currentDate,dir*7);
+  else currentDate=new Date(currentDate.getFullYear(),currentDate.getMonth()+dir,1);
+  render();
+}
+
+function buildLegend(){
+  document.getElementById('legend').innerHTML=ROOMS.map(r=>
+    `<div class="legend-item">
+      <div class="legend-dot" style="background:${r.color}"></div>
+      <span style="color:#CBD5E1">${r.name}</span>
+    </div>`
+  ).join('');
+}
+
+function buildRoomFilter(){
+  document.getElementById('room-filter').innerHTML=ROOMS.map(r=>{
+    const on=activeRooms.has(r.id);
+    return`<div class="pill" id="pill-${r.id}"
+      style="background:${on?r.bg:'transparent'};color:${on?r.text:'#94A3B8'};border-color:${on?r.color:'#CBD5E1'}"
+      onclick="toggleRoom('${r.id}')">${r.name}</div>`;
+  }).join('');
+}
+
+function toggleRoom(id){
+  if(activeRooms.has(id)){if(activeRooms.size>1)activeRooms.delete(id)}
+  else activeRooms.add(id);
+  buildRoomFilter();render();
+}
+
+function render(){
+  buildRoomFilter();
+  view==='week'?renderWeek():renderMonth();
+}
+
+function renderWeek(){
+  const ws=getMonday(currentDate);
+  const days=Array.from({length:7},(_,i)=>addDays(ws,i));
+  const m=ws.getMonth();
+  document.getElementById('nav-label').textContent=`${ws.getDate()} – ${days[6].getDate()} ${MONTHS_TR[m]}`;
+
+  const cols=1+days.length;
+  let html=`<div class="grid-header" style="grid-template-columns:44px repeat(7,1fr)">`;
+  html+=`<div class="col-hdr"></div>`;
+  days.forEach(d=>{
+    const tod=isToday(d);
+    html+=`<div class="col-hdr${tod?' today-hdr':''}">${DAYS_TR[(d.getDay()+6)%7]}<br>${d.getDate()}</div>`;
+  });
+  html+=`</div>`;
+
+  HOURS.forEach(h=>{
+    html+=`<div class="hour-row" style="display:grid;grid-template-columns:44px repeat(7,1fr)">`;
+    html+=`<div class="time-col">${h}:00</div>`;
+    days.forEach(d=>{
+      const ds=dateStr(d);
+      const res=reservations.filter(r=>r.date===ds&&r.start<=h&&r.end>h&&activeRooms.has(r.room));
+      const isStartHour=reservations.filter(r=>r.date===ds&&r.start===h&&activeRooms.has(r.room));
+      html+=`<div class="day-cell" onclick="openNew('${ds}',${h})">`;
+      isStartHour.forEach(r=>{
+        const rm=ROOMS.find(x=>x.id===r.room);
+        const span=r.end-r.start;
+        const h2=Math.min(span*48-4,140);
+        html+=`<div class="res-block"
+          style="background:${rm.bg};color:${rm.text};border-left-color:${rm.color};height:${h2}px"
+          onclick="event.stopPropagation();openEdit(${r.id})"
+          title="${rm.name}: ${r.note||''}">
+          ${rm.name.split(' ')[0]} ${r.note?'· '+r.note:''}
+        </div>`;
+      });
+      html+=`</div>`;
+    });
+    html+=`</div>`;
+  });
+
+  document.getElementById('calendar').innerHTML=html;
+}
+
+function renderMonth(){
+  const yr=currentDate.getFullYear(),mn=currentDate.getMonth();
+  document.getElementById('nav-label').textContent=`${MONTHS_TR[mn]} ${yr}`;
+  const firstDow=new Date(yr,mn,1).getDay();
+  const offset=(firstDow===0?6:firstDow-1);
+  const daysInMonth=new Date(yr,mn+1,0).getDate();
+  const total=Math.ceil((offset+daysInMonth)/7)*7;
+
+  let html=`<div class="month-grid">`;
+  DAYS_TR.forEach(d=>html+=`<div class="col-hdr" style="border-bottom:1px solid #E2E8F0">${d}</div>`);
+
+  for(let i=0;i<total;i++){
+    const dayNum=i-offset+1;
+    const inMonth=dayNum>=1&&dayNum<=daysInMonth;
+    const d=new Date(yr,mn,dayNum);
+    const ds=dateStr(d);
+    const tod=inMonth&&isToday(d);
+    const dayRes=reservations.filter(r=>r.date===ds&&activeRooms.has(r.room));
+    html+=`<div class="month-day${inMonth?'':' other-month'}" onclick="${inMonth?`openNew('${ds}',9)`:''}">`;
+    html+=`<div class="day-num${tod?' is-today':''}">${inMonth?dayNum:''}</div>`;
+    dayRes.slice(0,3).forEach(r=>{
+      const rm=ROOMS.find(x=>x.id===r.room);
+      html+=`<div class="month-res" style="background:${rm.bg};color:${rm.text}"
+        onclick="event.stopPropagation();openEdit(${r.id})">
+        ${r.start}:00 ${rm.name.split(' ')[0]}${r.note?' · '+r.note:''}
+      </div>`;
+    });
+    if(dayRes.length>3)html+=`<div style="font-size:10px;color:#94A3B8">+${dayRes.length-3} daha</div>`;
+    html+=`</div>`;
+  }
+  html+=`</div>`;
+  document.getElementById('calendar').innerHTML=html;
+}
+
+function openNew(date,hour){
+  const firstRoom=ROOMS.find(r=>activeRooms.has(r.id));
+  showModal({id:null,room:firstRoom?.id||'a',date,start:hour,end:Math.min(hour+1,22),people:[],note:''});
+}
+
+function openEdit(id){
+  const r=reservations.find(x=>x.id===id);
+  if(r)showModal({...r,people:[...r.people]});
+}
+
+function showModal(data){
+  const isEdit=!!data.id;
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>${isEdit?'Rezervasyonu Düzenle':'Yeni Rezervasyon'}</h3>
+    <div class="form-row">
+      <label>Oda</label>
+      <select id="m-room">
+        ${ROOMS.map(r=>`<option value="${r.id}"${r.id===data.room?' selected':''}>${r.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Tarih</label>
+      <input type="date" id="m-date" value="${data.date}">
+    </div>
+    <div class="two-col">
+      <div class="form-row">
+        <label>Başlangıç</label>
+        <select id="m-start">
+          ${HOURS.map(h=>`<option value="${h}"${h===data.start?' selected':''}>${h}:00</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Bitiş</label>
+        <select id="m-end">
+          ${[...HOURS.slice(1),22].map(h=>`<option value="${h}"${h===data.end?' selected':''}>${h}:00</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Katılımcılar</label>
+      <div class="people-grid">
+        ${TEAM.map(p=>`
+          <label>
+            <input type="checkbox" value="${p}"${data.people.includes(p)?' checked':''}>
+            ${p}
+          </label>`).join('')}
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Not / Açıklama</label>
+      <textarea id="m-note" placeholder="Seans amacı, ekipman notları...">${data.note||''}</textarea>
+    </div>
+    <div class="modal-footer">
+      ${isEdit?`<button class="btn-delete" onclick="deleteRes(${data.id})">Sil</button>`:''}
+      <button onclick="closeModal()">İptal</button>
+      <button class="btn-save" onclick="saveRes(${data.id||'null'})">Kaydet</button>
+    </div>
+  </div>
+  </div>`;
+}
+
+function saveRes(id){
+  const room=document.getElementById('m-room').value;
+  const date=document.getElementById('m-date').value;
+  const start=parseInt(document.getElementById('m-start').value);
+  const end=parseInt(document.getElementById('m-end').value);
+  const people=[...document.querySelectorAll('#modal-root input[type=checkbox]:checked')].map(c=>c.value);
+  const note=document.getElementById('m-note').value.trim();
+  if(end<=start){alert('Bitiş saati başlangıçtan sonra olmalı');return}
+
+  let reservation;
+  if(id&&id!=='null'){
+    reservation=reservations.find(x=>x.id===id);
+    if(reservation) Object.assign(reservation,{room,date,start,end,people,note});
+  }else{
+    reservation={id:nextId++,room,date,start,end,people,note};
+    reservations.push(reservation);
+  }
+  saveData();
+  pushToScript(reservation);
+  closeModal();render();
+}
+
+function deleteRes(id){
+  const reservation=reservations.find(r=>r.id===id);
+  reservations=reservations.filter(r=>r.id!==id);
+  saveData();
+  if(reservation) pushToScript(reservation, true);
+  closeModal();render();
+}
+
+function closeModal(){document.getElementById('modal-root').innerHTML=''}
+
+loadData();buildLegend();render();
+</script>
+</body>
+</html>
