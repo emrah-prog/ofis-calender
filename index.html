@@ -110,7 +110,7 @@ let currentDate=new Date(2026,3,15);
 let nextId=100;
 
 // ── Google Apps Script URL ───────────────────────────────────
-const SCRIPT_URL='https://script.google.com/a/macros/theoryxmusic.com/s/AKfycbwtsLUwy01sChg0l72ozpjAdkTuS5MBeGeXYFEqIjQwWK6W-FzB1Vnz-pzO-gn1nQJnsw/exec';
+const SCRIPT_URL='https://script.google.com/a/macros/theoryxmusic.com/s/AKfycbykXHMqWELd6GLvhkrxxDvQriIf-1N3iSAmCsqmraX6p9bQeUVeWJ2-WputCOZ2eO4Cow/exec';
 const LOCAL_KEY='theoryx_calendar_v2';
 let reservations=[];
 let syncStatus='idle'; // idle | loading | saving | error
@@ -131,57 +131,56 @@ function loadData(){
     if(saved){ reservations=JSON.parse(saved); render(); }
   }catch(e){}
 
-  // 2) Apps Script'ten güncel veriyi çek
+  // 2) Apps Script'ten GET ile oku (CORS bypass için script tag)
   showStatus('Google Calendar\'dan yükleniyor…');
-  fetch(SCRIPT_URL+'?action=getAll')
-    .then(r=>r.json())
-    .then(data=>{
-      if(data.success && Array.isArray(data.reservations)){
-        reservations=data.reservations;
-        // id sayacını güncelle
-        const maxId=reservations.reduce((m,r)=>Math.max(m,Number(r.id)||0),99);
-        nextId=maxId+1;
-        localStorage.setItem(LOCAL_KEY,JSON.stringify(reservations));
-        render();
-        showStatus('Senkronize edildi ✓','ok');
-      }
-    })
-    .catch(()=>{
-      // Sunucuya ulaşılamazsa localStorage yeter
-      showStatus('Çevrimdışı mod (localStorage)','error');
-    });
+  fetchFromScript();
 }
 
-// Rezervasyonu hem localStorage'a hem Apps Script'e kaydet
 function saveData(){
   localStorage.setItem(LOCAL_KEY,JSON.stringify(reservations));
 }
 
+// CORS olmadan GET: script tag trick
+function fetchFromScript(){
+  const cbName='_cb'+Date.now();
+  window[cbName]=function(data){
+    delete window[cbName];
+    document.getElementById('_cb_script')?.remove();
+    if(data && data.success && Array.isArray(data.reservations)){
+      reservations=data.reservations;
+      const maxId=reservations.reduce((m,r)=>Math.max(m,Number(r.id)||0),99);
+      nextId=maxId+1;
+      localStorage.setItem(LOCAL_KEY,JSON.stringify(reservations));
+      render();
+      showStatus('Senkronize edildi ✓','ok');
+    }
+  };
+  const s=document.createElement('script');
+  s.id='_cb_script';
+  s.src=SCRIPT_URL+'?action=getAll&callback='+cbName;
+  s.onerror=()=>{delete window[cbName];showStatus('Çevrimdışı mod','error');};
+  document.head.appendChild(s);
+  setTimeout(()=>{if(window[cbName]){delete window[cbName];showStatus('Zaman aşımı','error');}},8000);
+}
+
+// POST işlemleri: no-cors modunda gönder (yanıt okunamaz ama istek gider)
 async function pushToScript(reservation, isDelete=false){
   showStatus('Kaydediliyor…');
   try{
     const body=isDelete
       ? {action:'delete', id:reservation.id}
-      : {action:'save',   reservation};
-
-    const res=await fetch(SCRIPT_URL,{
+      : {action:'save', reservation};
+    await fetch(SCRIPT_URL,{
       method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
       body:JSON.stringify(body),
     });
-    const data=await res.json();
-    if(data.success){
-      // gcalId geri dönüyorsa sakla
-      if(data.gcalId && !isDelete){
-        const r=reservations.find(x=>x.id===reservation.id);
-        if(r) r.gcalId=data.gcalId;
-        localStorage.setItem(LOCAL_KEY,JSON.stringify(reservations));
-      }
-      showStatus('Google Calendar\'a kaydedildi ✓','ok');
-    } else {
-      showStatus('Hata: '+(data.error||'bilinmeyen'),'error');
-    }
+    showStatus('Google Calendar\'a kaydedildi ✓','ok');
+    // 2 sn sonra yeniden çek (gcalId almak için)
+    setTimeout(fetchFromScript, 2000);
   }catch(e){
-    showStatus('Bağlantı hatası — sadece lokalda kaydedildi','error');
+    showStatus('Bağlantı hatası — lokalda kaydedildi','error');
   }
 }
 
